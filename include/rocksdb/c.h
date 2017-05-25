@@ -306,6 +306,11 @@ extern ROCKSDB_LIBRARY_API void rocksdb_release_snapshot(
    Else returns a pointer to a malloc()-ed null-terminated value. */
 extern ROCKSDB_LIBRARY_API char* rocksdb_property_value(rocksdb_t* db,
                                                         const char* propname);
+
+extern ROCKSDB_LIBRARY_API char* rocksdb_transactiondb_property_value(
+    rocksdb_transactiondb_t* db,
+    const char* propname);
+
 /* returns 0 on success, -1 otherwise */
 int rocksdb_property_int(
     rocksdb_t* db,

@@ -957,6 +957,18 @@ char* rocksdb_property_value(
   }
 }
 
+char* rocksdb_transactiondb_property_value(
+    rocksdb_transactiondb_t* db,
+    const char* propname) {
+  std::string tmp;
+  if (db->rep->GetProperty(Slice(propname), &tmp)) {
+    // We use strdup() since we expect human readable output.
+    return strdup(tmp.c_str());
+  } else {
+    return nullptr;
+  }
+}
+
 int rocksdb_property_int(
     rocksdb_t* db,
     const char* propname,
