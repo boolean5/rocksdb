@@ -38,6 +38,7 @@
 #include "utilities/merge_operators.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
+#include "rocksdb/utilities/optimistic_transaction_db.h"
 #include "rocksdb/utilities/checkpoint.h"
 
 using rocksdb::BytewiseComparator;
@@ -95,7 +96,9 @@ using rocksdb::NewGenericRateLimiter;
 using rocksdb::PinnableSlice;
 using rocksdb::TransactionDBOptions;
 using rocksdb::TransactionDB;
+using rocksdb::OptimisticTransactionDB;
 using rocksdb::TransactionOptions;
+using rocksdb::OptimisticTransactionOptions;
 using rocksdb::Transaction;
 using rocksdb::Checkpoint;
 
@@ -145,8 +148,14 @@ struct rocksdb_transactiondb_options_t {
 struct rocksdb_transactiondb_t {
   TransactionDB* rep;
 };
+struct rocksdb_optimistic_transactiondb_t {
+  OptimisticTransactionDB* rep;
+};
 struct rocksdb_transaction_options_t {
   TransactionOptions rep;
+};
+struct rocksdb_optimistic_transaction_options_t {
+  OptimisticTransactionOptions rep;
 };
 struct rocksdb_transaction_t {
   Transaction* rep;
@@ -3184,12 +3193,25 @@ rocksdb_transaction_options_t* rocksdb_transaction_options_create() {
   return new rocksdb_transaction_options_t;
 }
 
+rocksdb_optimistic_transaction_options_t* rocksdb_optimistic_transaction_options_create() {
+  return new rocksdb_optimistic_transaction_options_t;
+}
+
 void rocksdb_transaction_options_destroy(rocksdb_transaction_options_t* opt) {
+  delete opt;
+}
+
+void rocksdb_optimistic_transaction_options_destroy(rocksdb_optimistic_transaction_options_t* opt) {
   delete opt;
 }
 
 void rocksdb_transaction_options_set_set_snapshot(
     rocksdb_transaction_options_t* opt, unsigned char v) {
+  opt->rep.set_snapshot = v;
+}
+
+void rocksdb_optimistic_transaction_options_set_set_snapshot(
+    rocksdb_optimistic_transaction_options_t* opt, unsigned char v) {
   opt->rep.set_snapshot = v;
 }
 
@@ -3218,6 +3240,13 @@ void rocksdb_transaction_options_set_max_write_batch_size(
   opt->rep.max_write_batch_size = size;
 }
 
+rocksdb_t* rocksdb_get_base_db(
+    rocksdb_transactiondb_t* txn_db) {
+  rocksdb_t* result = new rocksdb_t;
+  result->rep = txn_db->rep->GetBaseDB();
+  return result;
+}
+
 rocksdb_transactiondb_t* rocksdb_transactiondb_open(
     const rocksdb_options_t* options,
     const rocksdb_transactiondb_options_t* txn_db_options, const char* name,
@@ -3228,6 +3257,20 @@ rocksdb_transactiondb_t* rocksdb_transactiondb_open(
     return nullptr;
   }
   rocksdb_transactiondb_t* result = new rocksdb_transactiondb_t;
+  result->rep = txn_db;
+  return result;
+}
+
+rocksdb_optimistic_transactiondb_t* rocksdb_optimistic_transactiondb_open(
+    const rocksdb_options_t* options,
+    const char* name,
+    char** errptr) {
+  OptimisticTransactionDB* txn_db;
+  if (SaveError(errptr, OptimisticTransactionDB::Open(options->rep, 
+                 std::string(name), &txn_db))) {
+    return nullptr;
+  }
+  rocksdb_optimistic_transactiondb_t* result = new rocksdb_optimistic_transactiondb_t;
   result->rep = txn_db;
   return result;
 }
@@ -3249,6 +3292,22 @@ rocksdb_transaction_t* rocksdb_transaction_begin(
     rocksdb_transactiondb_t* txn_db,
     const rocksdb_writeoptions_t* write_options,
     const rocksdb_transaction_options_t* txn_options,
+    rocksdb_transaction_t* old_txn) {
+  if (old_txn == nullptr) {
+    rocksdb_transaction_t* result = new rocksdb_transaction_t;
+    result->rep = txn_db->rep->BeginTransaction(write_options->rep,
+                                                txn_options->rep, nullptr);
+    return result;
+  }
+  old_txn->rep = txn_db->rep->BeginTransaction(write_options->rep,
+                                                txn_options->rep, old_txn->rep);
+  return old_txn;
+}
+
+rocksdb_transaction_t* rocksdb_optimistic_transaction_begin(
+    rocksdb_optimistic_transactiondb_t* txn_db,
+    const rocksdb_writeoptions_t* write_options,
+    const rocksdb_optimistic_transaction_options_t* txn_options,
     rocksdb_transaction_t* old_txn) {
   if (old_txn == nullptr) {
     rocksdb_transaction_t* result = new rocksdb_transaction_t;
@@ -3354,6 +3413,11 @@ rocksdb_iterator_t* rocksdb_transaction_create_iterator(
 }
 
 void rocksdb_transactiondb_close(rocksdb_transactiondb_t* txn_db) {
+  delete txn_db->rep;
+  delete txn_db;
+}
+
+void rocksdb_optimistic_transactiondb_close(rocksdb_optimistic_transactiondb_t* txn_db) {
   delete txn_db->rep;
   delete txn_db;
 }
