@@ -117,6 +117,8 @@ typedef struct rocksdb_transactiondb_t rocksdb_transactiondb_t;
 typedef struct rocksdb_transaction_options_t rocksdb_transaction_options_t;
 typedef struct rocksdb_transaction_t rocksdb_transaction_t;
 typedef struct rocksdb_checkpoint_t rocksdb_checkpoint_t;
+typedef struct rocksdb_optimistic_transactiondb_t rocksdb_optimistic_transactiondb_t;
+typedef struct rocksdb_optimistic_transaction_options_t rocksdb_optimistic_transaction_options_t;
 
 /* DB operations */
 
@@ -1344,6 +1346,34 @@ rocksdb_transaction_options_set_deadlock_detect_depth(
 extern ROCKSDB_LIBRARY_API void
 rocksdb_transaction_options_set_max_write_batch_size(
     rocksdb_transaction_options_t* opt, size_t size);
+
+/* Optimistic Transactions */
+
+extern ROCKSDB_LIBRARY_API char* rocksdb_transactiondb_property_value(
+    rocksdb_transactiondb_t* db,
+    const char* propname);
+
+extern ROCKSDB_LIBRARY_API rocksdb_t* rocksdb_get_base_db(
+    rocksdb_optimistic_transactiondb_t* txn_db);
+
+extern ROCKSDB_LIBRARY_API rocksdb_optimistic_transactiondb_t* rocksdb_optimistic_transactiondb_open(
+    const rocksdb_options_t* options,
+    const char* name,
+    char** errptr);
+
+extern ROCKSDB_LIBRARY_API rocksdb_transaction_t* rocksdb_optimistic_transaction_begin(
+    rocksdb_optimistic_transactiondb_t* txn_db,
+    const rocksdb_writeoptions_t* write_options,
+    const rocksdb_optimistic_transaction_options_t* txn_options,
+    rocksdb_transaction_t* old_txn);
+
+extern ROCKSDB_LIBRARY_API void rocksdb_optimistic_transactiondb_close(rocksdb_optimistic_transactiondb_t* txn_db);
+
+extern ROCKSDB_LIBRARY_API rocksdb_optimistic_transaction_options_t* rocksdb_optimistic_transaction_options_create();
+
+extern ROCKSDB_LIBRARY_API void rocksdb_optimistic_transaction_options_destroy(rocksdb_optimistic_transaction_options_t* opt);
+
+extern ROCKSDB_LIBRARY_API void rocksdb_optimistic_transaction_options_set_set_snapshot(rocksdb_optimistic_transaction_options_t* opt, unsigned char v);
 
 // referring to convention (3), this should be used by client
 // to free memory that was malloc()ed
